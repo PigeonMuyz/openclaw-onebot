@@ -36,6 +36,9 @@ const forwardPendingSessions = new Map<string, number>();
 /** 每个 replySessionId 已发送的 chunk 数量，用于支持多次 final（如工具调用后追加内容） */
 const lastSentChunkCountBySession = new Map<string, number>();
 const FORWARD_PENDING_TTL_MS = 5 * 60 * 1000; // 5 分钟
+
+/** /stop 中断支持：每个用户 session 对应一个 AbortController */
+const activeSessionAborts = new Map<string, AbortController>();
 const FORWARD_CLEANUP_INTERVAL_MS = 60 * 1000; // 每分钟清理一次
 
 function cleanupForwardPendingSessions(): void {
@@ -92,7 +95,34 @@ export async function processInboundMessage(api: any, msg: OneBotMessage): Promi
         messageText = getRawText(msg);
     }
     if (!messageText?.trim()) {
-        api.logger?.info?.(`[onebot] ignoring empty message`);
+        api.logger?.info?.("[onebot] ignoring empty message");
+        return;
+    }
+
+    // ===== /stop 中断指令 =====
+    const trimmedCmd = messageText.trim().toLowerCase();
+    if (trimmedCmd === "/stop" || trimmedCmd === "stop" || trimmedCmd === "/停止") {
+        const userId = msg.user_id!;
+        const stopSessionId = `onebot:user:${userId}`.toLowerCase();
+        const controller = activeSessionAborts.get(stopSessionId);
+        if (controller) {
+            controller.abort();
+            activeSessionAborts.delete(stopSessionId);
+            api.logger?.info?.(`[onebot] /stop: aborted session ${stopSessionId}`);
+            const getConfig = () => getOneBotConfig(api);
+            const isGroup = msg.message_type === "group";
+            try {
+                if (isGroup && msg.group_id) await sendGroupMsg(msg.group_id, "⏹️ 已停止生成", getConfig);
+                else await sendPrivateMsg(userId, "⏹️ 已停止生成", getConfig);
+            } catch (_) {}
+        } else {
+            const getConfig = () => getOneBotConfig(api);
+            const isGroup = msg.message_type === "group";
+            try {
+                if (isGroup && msg.group_id) await sendGroupMsg(msg.group_id, "当前没有正在生成的回复", getConfig);
+                else await sendPrivateMsg(userId, "当前没有正在生成的回复", getConfig);
+            } catch (_) {}
+        }
         return;
     }
 
@@ -294,6 +324,10 @@ export async function processInboundMessage(api: any, msg: OneBotMessage): Promi
 
     api.logger?.info?.(`[onebot] dispatching message for session ${sessionId}`);
 
+    // 注册 AbortController 支持 /stop 中断
+    const abortController = new AbortController();
+    activeSessionAborts.set(sessionId, abortController);
+
     const longMessageMode = (onebotCfg.longMessageMode as "normal" | "og_image" | "forward") ?? "normal";
     const longMessageThreshold = (onebotCfg.longMessageThreshold as number) ?? 300;
 
@@ -333,6 +367,11 @@ export async function processInboundMessage(api: any, msg: OneBotMessage): Promi
             cfg,
             dispatcherOptions: {
                 deliver: async (payload: unknown, info: { kind: string }) => {
+                    // /stop 中断检查
+                    if (abortController.signal.aborted) {
+                        api.logger?.info?.("[onebot] deliver skipped: session aborted by /stop");
+                        return;
+                    }
                     await clearEmojiReaction();
 
                     const p = payload as { text?: string; body?: string; mediaUrl?: string; mediaUrls?: string[] } | string;
@@ -547,6 +586,7 @@ export async function processInboundMessage(api: any, msg: OneBotMessage): Promi
             else if (uid) await sendPrivateMsg(uid, `处理失败: ${err?.message?.slice(0, 80) || "未知错误"}`);
         } catch (_) { }
     } finally {
+        activeSessionAborts.delete(sessionId);
         setForwardSuppressDelivery(false);
         setActiveReplySelfId(null);
         lastSentChunkCountBySession.delete(replySessionId);
