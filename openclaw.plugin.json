@@ -1,7 +1,7 @@
 {
   "id": "openclaw-onebot",
   "name": "OneBot Channel",
-  "version": "1.0.1",
+  "version": "1.0.6",
   "description": "OneBot v11 protocol channel (QQ/Lagrange.Core via WebSocket)",
   "author": "Lagrange.Onebot",
   "channels": ["onebot"],
