@@ -160,9 +160,8 @@ export async function processInboundMessage(api: any, msg: OneBotMessage): Promi
     }
 
     const groupId = msg.group_id;
-    const sessionId = isGroup
-        ? `onebot:group:${groupId}`.toLowerCase()
-        : `onebot:${userId}`.toLowerCase();
+    // 用户导向：同一用户不管在群聊还是私聊中都共享同一个 AI 上下文
+    const sessionId = `onebot:user:${userId}`.toLowerCase();
 
     const route = runtime.channel.routing?.resolveAgentRoute?.({
         cfg,
