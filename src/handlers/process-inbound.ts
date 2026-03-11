@@ -101,7 +101,7 @@ export async function processInboundMessage(api: any, msg: OneBotMessage): Promi
 
     // ===== /stop 中断指令 =====
     const trimmedCmd = messageText.trim().toLowerCase();
-    if (trimmedCmd === "/stop" || trimmedCmd === "stop" || trimmedCmd === "/停止") {
+    if (trimmedCmd === "/stop") {
         const userId = msg.user_id!;
         const stopSessionId = `onebot:user:${userId}`.toLowerCase();
         const controller = activeSessionAborts.get(stopSessionId);
