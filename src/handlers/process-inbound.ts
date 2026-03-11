@@ -150,12 +150,7 @@ export async function processInboundMessage(api: any, msg: OneBotMessage): Promi
         // 私聊白名单检查
         const whitelist = getWhitelistUserIds(cfg);
         if (whitelist.length > 0 && !whitelist.includes(Number(msg.user_id))) {
-            const denyMsg = "权限不足，请向管理员申请权限";
-            const getConfig = () => getOneBotConfig(api);
-            try {
-                await sendPrivateMsg(msg.user_id!, denyMsg, getConfig);
-            } catch (_) {}
-            api.logger?.info?.(`[onebot] private: user ${msg.user_id} not in whitelist, denied`);
+            api.logger?.info?.(`[onebot] private: user ${msg.user_id} not in whitelist, ignored`);
             return;
         }
         // 私聊前缀符号检查
