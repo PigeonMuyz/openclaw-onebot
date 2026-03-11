@@ -2,10 +2,11 @@
 
 # openclaw-onebot
 
-[OpenClaw](https://openclaw.ai)  的 **OneBot v11 协议**（QQ/Lagrange.Core、go-cqhttp 等）渠道插件。
+[OpenClaw](https://openclaw.ai) 的 **OneBot v11 协议**（QQ/Lagrange.Core、go-cqhttp 等）渠道插件。
 
-[![npm version](https://img.shields.io/npm/v/@kirigaya/openclaw-onebot?style=flat-square)](https://www.npmjs.com/package/@kirigaya/openclaw-onebot)
-[![GitHub stars](https://img.shields.io/github/stars/LSTM-Kirigaya/openclaw-onebot?style=flat-square)](https://github.com/LSTM-Kirigaya/openclaw-onebot)
+> **Fork 说明**：本项目 Fork 自 [@kirigaya/openclaw-onebot](https://github.com/LSTM-Kirigaya/openclaw-onebot)，在原版基础上新增了消息过滤和用户导向会话功能。感谢原作者 [LSTM-Kirigaya](https://github.com/LSTM-Kirigaya) 的开源贡献。
+
+[![npm version](https://img.shields.io/npm/v/@pigeonmuyz/openclaw-onebot?style=flat-square)](https://www.npmjs.com/package/@pigeonmuyz/openclaw-onebot)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](LICENSE)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D22-brightgreen?style=flat-square)](https://nodejs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.4-blue?style=flat-square)](https://www.typescriptlang.org/)
@@ -15,214 +16,81 @@
 
 ---
 
-## 教程
+## 与原版的差异
 
-📖 **完整安装与配置教程**：[让 QQ 接入 openclaw！让你的助手掌管千人大群](https://kirigaya.cn/blog/article?seq=368)
+### 🧑 用户导向会话（非消息渠道导向）
 
-## 功能
+原版中，群聊和私聊各自维护独立的 AI 上下文。本 Fork **以用户为中心**：同一用户无论在群聊中 @bot 还是在私聊中发消息，都共享同一个 AI 对话上下文。
 
-- ✅ 私聊：所有消息 AI 都会回复
-- ✅ 群聊：仅当用户 @ 机器人时回复（可配置）
-- ✅ 自动获取上下文
-- ✅ 新成员入群欢迎
-- ✅ 自动合并转发长消息
-- ✅ **长消息生成图片**：超过阈值可将 Markdown 渲染为图片发送（可选主题：default / dust / custom 自定义 CSS）
-- ✅ 支持文件，图像读取/上传
-- ✅ 支持白名单系统
-- ✅ 通过 `openclaw message send` CLI 发送（无 Agent 工具，降低 token 消耗）
+```
+原版：群聊 A → 上下文 A    私聊 → 上下文 B    （互相隔离）
+Fork：群聊 A → 上下文 User  私聊 → 上下文 User  （共享记忆）
+```
+
+回复仍然发送到正确位置——群消息回群，私聊回私聊。
+
+### 🔒 消息过滤规则
+
+| 场景 | 规则 |
+|------|------|
+| **群聊** | 白名单非空时，仅白名单用户 @bot 才处理；非白名单用户**静默忽略** |
+| **私聊** | 白名单非空时，非白名单用户回复"权限不足"；有前缀时消息必须以前缀开头 |
+
+### 🔧 新增配置项
+
+| 配置项 | 说明 |
+|--------|------|
+| `privateMessagePrefix` | 私聊消息前缀符号（如 `/` 或 `#`），仅以此符号开头的私聊消息才处理 |
+
+可通过 `openclaw onebot setup` 向导配置。
+
+---
 
 ## 安装
 
 ```bash
-openclaw plugins install @kirigaya/openclaw-onebot
+openclaw plugins install @pigeonmuyz/openclaw-onebot
 openclaw onebot setup
 ```
 
-## 安装 onebot 服务端
+## 配置示例
 
-你需要安装 onebot 服务端，QQ 目前比较常用的是 onebot 服务端是 NapCat，可以查看 [官网](https://napneko.github.io/) 了解安装方法
+```json
+{
+  "channels": {
+    "onebot": {
+      "whitelistUserIds": [1193466151, 2575183654],
+      "privateMessagePrefix": "/",
+      "requireMention": true,
+      "renderMarkdownToPlain": true,
+      "longMessageMode": "normal",
+      "longMessageThreshold": 300
+    }
+  }
+}
+```
 
+## 功能
 
-### 连接类型
-
-| 类型 | 说明 |
-|------|------|
-| `forward-websocket` | 插件主动连接 OneBot（go-cqhttp、Lagrange.Core 正向 WS） |
-| `backward-websocket` | 插件作为服务端，OneBot 连接过来 |
-
-### 环境变量
-
-可替代配置文件，适用于 Lagrange 等：
-
-| 变量 | 说明 |
-|------|------|
-| `ONEBOT_WS_TYPE` | forward-websocket / backward-websocket |
-| `ONEBOT_WS_HOST` | 主机地址 |
-| `ONEBOT_WS_PORT` | 端口 |
-| `ONEBOT_WS_ACCESS_TOKEN` | 访问令牌 |
+- ✅ 私聊/群聊消息处理（用户导向共享上下文）
+- ✅ 群聊 @bot 触发回复（可配置）
+- ✅ 白名单 + 私聊前缀符号过滤
+- ✅ 自动获取引用上下文
+- ✅ 新成员入群欢迎
+- ✅ 自动合并转发长消息
+- ✅ 长消息生成图片（og_image 模式）
+- ✅ 支持文件、图像读取/上传
+- ✅ 通过 `openclaw message send` CLI 发送
 
 ## 使用
 
-1. 安装并配置
+1. 安装并配置（`openclaw onebot setup`）
 2. 重启 Gateway：`openclaw gateway restart`
 3. 在 QQ 私聊或群聊中发消息（群聊需 @ 机器人）
 
-## 长消息处理与 OG 图片渲染
-
-当单次回复超过**长消息阈值**（默认 300 字）时，可选用三种模式（`openclaw onebot setup` 中配置）：
-
-| 模式 | 说明 |
-|------|------|
-| `normal` | 正常分段发送 |
-| `og_image` | 将 Markdown 转为 HTML 再生成图片发送（需安装 `node-html-to-image`） |
-| `forward` | 合并转发（发给自己后打包转发） |
-
-选择 **生成图片发送（og_image）** 时，会额外询问**渲染主题**：
-
-| 选项 | 说明 |
-|------|------|
-| **default** | 无额外样式，默认白底黑字 |
-| **dust** | 内置主题：暖色、旧纸质感 |
-| **custom** | 自定义：在 `ogImageRenderThemePath` 中填写 CSS 文件绝对路径 |
-
-配置项（枚举 + 可选路径）：
-
-- `ogImageRenderTheme`：`"default"` | `"dust"` | `"custom"`
-- `ogImageRenderThemePath`：当为 `custom` 时必填，CSS 文件绝对路径
-
-示例（`openclaw.json`）：
-
-```json
-{
-  "channels": {
-    "onebot": {
-      "longMessageMode": "og_image",
-      "longMessageThreshold": 300,
-      "ogImageRenderTheme": "dust"
-    }
-  }
-}
-```
-
-自定义主题示例：
-
-```json
-{
-  "channels": {
-    "onebot": {
-      "longMessageMode": "og_image",
-      "ogImageRenderTheme": "custom",
-      "ogImageRenderThemePath": "C:/path/to/your-theme.css"
-    }
-  }
-}
-```
-
-## 主动发送消息
-
-通过 `openclaw message send` CLI（无需 Agent 工具）：
-
-```bash
-# 发送文本
-openclaw message send --channel onebot --target user:123456789 --message "你好"
-
-# 发送图片
-openclaw message send --channel onebot --target group:987654321 --media "file:///path/to/image.png"
-```
-
-`--target` 格式：`user:QQ号` 或 `group:群号`。回复场景由 deliver 自动投递，Agent 输出 text/mediaUrl 即会送达。
-
-## 新成员入群欢迎（自定义图片）
-
-当有新成员加入群时，可根据其 ID 信息生成欢迎图片并发送。详见 [receive.md](skills/onebot-ops/receive.md#新成员入群欢迎)。
-
-1. 在 `openclaw.json` 中配置：
-
-```json
-{
-  "channels": {
-    "onebot": {
-      "groupIncrease": {
-        "enabled": true,
-        "command": "npx tsx src/openclaw/trigger/welcome.ts",
-        "cwd": "C:/path/to/Tiphareth"
-      }
-    }
-  }
-}
-```
-
-2. `command` 在 `cwd` 下用系统 shell 执行，环境变量传入 `GROUP_ID`、`GROUP_NAME`、`USER_ID`、`USER_NAME`、`AVATAR_URL`。命令可调用 `openclaw message send` 自行发送，或向 stdout 输出 JSON 行供 handler 发送。
-
-3. 测试：`npm run test:group-increase-handler`（DRY_RUN 模式，仅生成图片）
-
-## 回复白名单
-
-默认为空回复所有人的消息。如果设置的话，那么机器人就只会回复设置的数组里的用户的消息。
-
-```json
-{
-  "channels": {
-    "onebot": {
-      "whitelistUserIds": [1193466151],
-    }
-  }
-}
-```
-
-## 新人入群触发器
-
-如果有人入群之后，可以通过这个来实现触发器。
-
-```json
-{
-  "channels": {
-    "onebot": {
-      "groupIncrease": {
-        "enabled": true,
-        "command": "npx tsx welcome.ts",
-        "cwd": "/path/to/triggers"
-      }
-    }
-  }
-}
-```
-
-实现的脚本必须支持这三个参数：
-
-```
---userId ${userId} --username ${username} --groupId ${groupId}
-```
-
-## 测试
-
-### 测试连接
-
-项目内提供测试脚本（需 `.env` 或环境变量）：
-
-```bash
-cd openclaw-onebot
-npm run test:connect
-```
-
-### 测试 OG 图片渲染效果
-
-用于预览「Markdown 转图片」在不同主题下的渲染效果（需安装 `node-html-to-image`）：
-
-```bash
-cd openclaw-onebot
-# 无额外样式
-npm run test:render-og-image -- default
-# 内置 dust 主题
-npm run test:render-og-image -- dust
-# 自定义 CSS 文件（绝对路径）
-npm run test:render-og-image -- "C:/path/to/your-theme.css"
-```
-
-生成图片保存在 `test/output-render-<主题>.png`，可直接打开查看。
-
 ## 参考
 
+- [原版 openclaw-onebot](https://github.com/LSTM-Kirigaya/openclaw-onebot) — 原作者 [LSTM-Kirigaya](https://github.com/LSTM-Kirigaya)
 - [OneBot 11](https://github.com/botuniverse/onebot-11)
 - [go-cqhttp](https://docs.go-cqhttp.org/)
 - [Lagrange.Core](https://github.com/LSTM-Kirigaya/Lagrange.Core)
@@ -230,4 +98,4 @@ npm run test:render-og-image -- "C:/path/to/your-theme.css"
 
 ## License
 
-MIT © [LSTM-Kirigaya](https://github.com/LSTM-Kirigaya)
+MIT © [LSTM-Kirigaya](https://github.com/LSTM-Kirigaya) (原版) / [PigeonMuyz](https://github.com/PigeonMuyz) (Fork)
