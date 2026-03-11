@@ -177,7 +177,10 @@ export async function processInboundMessage(api: any, msg: OneBotMessage): Promi
 
     const envelopeOptions = runtime.channel.reply?.resolveEnvelopeFormatOptions?.(cfg) ?? {};
     const chatType = isGroup ? "group" : "direct";
-    const fromLabel = String(userId);
+    // 从 sender 中提取昵称（v11 消息自带 sender.card / sender.nickname）
+    const senderObj = (msg as any).sender;
+    const nickname = senderObj?.card || senderObj?.nickname || "";
+    const fromLabel = nickname ? `${nickname} (@${userId})` : String(userId);
 
     const formattedBody =
         runtime.channel.reply?.formatInboundEnvelope?.({
@@ -234,7 +237,7 @@ export async function processInboundMessage(api: any, msg: OneBotMessage): Promi
         SessionKey: sessionId,
         AccountId: config.accountId ?? "default",
         ChatType: chatType,
-        ConversationLabel: replyTarget, // 与 Feishu 一致：表示会话/回复目标，群聊时为 group:群号，非 SenderId
+        ConversationLabel: nickname ? `${nickname} (@${userId})` : replyTarget,
         SenderName: fromLabel,
         SenderId: String(userId),
         Provider: "onebot",
