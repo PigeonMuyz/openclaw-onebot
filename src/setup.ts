@@ -125,10 +125,19 @@ export async function runOneBotSetup(): Promise<void> {
 
   const whitelistInput = guardCancel(
     await clackText({
-      message: "白名单 QQ 号（逗号分隔，留空则所有人可回复）",
+      message: "白名单 QQ 号（逗号分隔，留空则所有人可回复）\n  群聊：仅白名单用户 @机器人 时响应\n  私聊：仅白名单用户可触发",
       initialValue: whitelistInitial,
     })
   );
+
+  const privateMessagePrefixInitial = prevOnebot?.privateMessagePrefix ?? "";
+  const privateMessagePrefixInput = guardCancel(
+    await clackText({
+      message: "私聊消息前缀符号（如 / 或 #，仅以此符号开头的私聊消息才会处理，留空则不限制）",
+      initialValue: privateMessagePrefixInitial,
+    })
+  );
+  const privateMessagePrefix = String(privateMessagePrefixInput || "").trim() || undefined;
 
   const port = parseInt(String(portStr).trim(), 10);
   if (!Number.isFinite(port)) {
@@ -152,6 +161,7 @@ export async function runOneBotSetup(): Promise<void> {
     ...(longMessageMode === "og_image" ? { ogImageRenderTheme, ...(ogImageRenderThemePath != null ? { ogImageRenderThemePath } : {}) } : {}),
     longMessageThreshold: Number.isFinite(thresholdNum) ? thresholdNum : 300,
     ...(whitelistIds.length > 0 ? { whitelistUserIds: whitelistIds } : {}),
+    ...(privateMessagePrefix ? { privateMessagePrefix } : {}),
   };
 
   const next = { ...existing, channels };

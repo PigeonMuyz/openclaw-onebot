@@ -11,7 +11,7 @@ import {
     getTextFromMessageContent,
     isMentioned,
 } from "../message.js";
-import { getRenderMarkdownToPlain, getCollapseDoubleNewlines, getWhitelistUserIds, getOgImageRenderTheme } from "../config.js";
+import { getRenderMarkdownToPlain, getCollapseDoubleNewlines, getWhitelistUserIds, getOgImageRenderTheme, getPrivateMessagePrefix } from "../config.js";
 import { markdownToPlain, collapseDoubleNewlines } from "../markdown.js";
 import { markdownToImage } from "../og-image.js";
 import {
@@ -100,14 +100,52 @@ export async function processInboundMessage(api: any, msg: OneBotMessage): Promi
     const cfg = api.config;
     const requireMention = (cfg?.channels?.onebot as any)?.requireMention ?? true;
 
-    if (isGroup && requireMention && !isMentioned(msg, selfId)) {
-        api.logger?.info?.(`[onebot] ignoring group message without @mention`);
-        return;
+    // ===== 群聊过滤 =====
+    if (isGroup) {
+        // 群聊必须 @bot（如果 requireMention 开启）
+        if (requireMention && !isMentioned(msg, selfId)) {
+            api.logger?.info?.(`[onebot] ignoring group message without @mention`);
+            return;
+        }
+        // 群聊白名单检查：白名单非空时，仅白名单用户 @bot 时才处理
+        const whitelist = getWhitelistUserIds(cfg);
+        if (whitelist.length > 0 && !whitelist.includes(Number(msg.user_id))) {
+            api.logger?.info?.(`[onebot] group: user ${msg.user_id} not in whitelist, ignored`);
+            return;
+        }
     }
 
+    // ===== 私聊过滤 =====
+    if (!isGroup) {
+        // 私聊白名单检查
+        const whitelist = getWhitelistUserIds(cfg);
+        if (whitelist.length > 0 && !whitelist.includes(Number(msg.user_id))) {
+            const denyMsg = "权限不足，请向管理员申请权限";
+            const getConfig = () => getOneBotConfig(api);
+            try {
+                await sendPrivateMsg(msg.user_id!, denyMsg, getConfig);
+            } catch (_) {}
+            api.logger?.info?.(`[onebot] private: user ${msg.user_id} not in whitelist, denied`);
+            return;
+        }
+        // 私聊前缀符号检查
+        const prefix = getPrivateMessagePrefix(cfg);
+        if (prefix) {
+            if (!messageText.trimStart().startsWith(prefix)) {
+                api.logger?.info?.(`[onebot] private: message missing prefix "${prefix}", ignored`);
+                return;
+            }
+            // 去掉前缀后继续处理
+            messageText = messageText.trimStart().slice(prefix.length).trimStart();
+            if (!messageText) {
+                api.logger?.info?.(`[onebot] private: message is only prefix, ignored`);
+                return;
+            }
+        }
+    }
+
+    const userId = msg.user_id!;
     const gi = (cfg?.channels?.onebot as Record<string, unknown>)?.groupIncrease as Record<string, unknown> | undefined;
-    // 测试欢迎：@ 机器人并发送 /group-increase，模拟当前发送者入群，触发欢迎（使用该人的 id、nickname 等）
-    // 使用 getTextFromSegments 提取纯文本，避免 raw_message 中 [CQ:at,qq=xxx] 等 CQ 码导致匹配失败
     const cmdText = getTextFromSegments(msg).trim() || messageText.trim();
     const groupIncreaseTrigger = isGroup && isMentioned(msg, selfId) && /^\/group-increase\s*$/i.test(cmdText) && gi?.enabled;
     if (groupIncreaseTrigger) {
@@ -121,18 +159,6 @@ export async function processInboundMessage(api: any, msg: OneBotMessage): Promi
         return;
     }
 
-    const userId = msg.user_id!;
-    const whitelist = getWhitelistUserIds(cfg);
-    if (whitelist.length > 0 && !whitelist.includes(Number(userId))) {
-        const denyMsg = "权限不足，请向管理员申请权限";
-        const getConfig = () => getOneBotConfig(api);
-        try {
-            if (msg.message_type === "group" && msg.group_id) await sendGroupMsg(msg.group_id, denyMsg, getConfig);
-            else await sendPrivateMsg(userId, denyMsg, getConfig);
-        } catch (_) {}
-        api.logger?.info?.(`[onebot] user ${userId} not in whitelist, denied`);
-        return;
-    }
     const groupId = msg.group_id;
     const sessionId = isGroup
         ? `onebot:group:${groupId}`.toLowerCase()

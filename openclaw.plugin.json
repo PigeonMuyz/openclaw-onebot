@@ -26,7 +26,11 @@
       "whitelistUserIds": {
         "type": "array",
         "items": { "type": "number" },
-        "description": "白名单 QQ 号，非空时仅白名单内用户可触发 AI；为空则所有人可回复"
+        "description": "白名单 QQ 号。群聊：仅白名单用户 @机器人 时响应；私聊：仅白名单用户可触发。为空则所有人可回复"
+      },
+      "privateMessagePrefix": {
+        "type": "string",
+        "description": "私聊消息前缀符号（如 / 或 #），仅以此符号开头的私聊消息才会处理。留空则不限制"
       },
       "renderMarkdownToPlain": {
         "type": "boolean",

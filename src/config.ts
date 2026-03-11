@@ -90,6 +90,12 @@ export function getOgImageRenderTheme(cfg: any): "default" | "dust" | string {
   return "default";
 }
 
+/** 私聊消息前缀符号，非空时私聊消息必须以此前缀开头才会处理 */
+export function getPrivateMessagePrefix(cfg: any): string {
+  const v = cfg?.channels?.onebot?.privateMessagePrefix;
+  return typeof v === "string" ? v.trim() : "";
+}
+
 export function listAccountIds(apiOrCfg: any): string[] {
   const cfg = apiOrCfg?.config ?? apiOrCfg ?? (globalThis as any).__onebotGatewayConfig;
   const accounts = cfg?.channels?.onebot?.accounts;
